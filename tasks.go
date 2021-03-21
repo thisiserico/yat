@@ -27,3 +27,14 @@ func fakeTaskList() tasks {
 		},
 	}
 }
+
+func (t *tasks) append(summary string) {
+	*t = append(*t, &task{
+		summary: summary,
+		addedAt: time.Now(),
+	})
+}
+
+func (t *task) toggle() {
+	t.isCompleted = !t.isCompleted
+}

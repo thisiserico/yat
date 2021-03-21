@@ -5,6 +5,7 @@ import (
 	"math"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -25,13 +26,21 @@ type command string
 
 type Model struct {
 	tasks
-	index int
+	index     int
+	taskInput textinput.Model
+
+	logs []string
 }
 
 func NewUI() *Model {
 	return &Model{
-		tasks: fakeTaskList(),
+		tasks:     fakeTaskList(),
+		taskInput: textinput.NewModel(),
 	}
+}
+
+func (m *Model) log(msg string) {
+	m.logs = append(m.logs, msg)
 }
 
 func (m *Model) Init() tea.Cmd {
@@ -39,6 +48,29 @@ func (m *Model) Init() tea.Cmd {
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.taskInput.Focused() {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.Type {
+			case tea.KeyEsc:
+				m.taskInput.Reset()
+				m.taskInput.Blur()
+
+			case tea.KeyEnter:
+				m.tasks.append(m.taskInput.Value())
+
+				m.taskInput.Reset()
+				m.taskInput.Blur()
+
+			default:
+				var cmd tea.Cmd
+				m.taskInput, cmd = m.taskInput.Update(msg)
+
+				return m, cmd
+			}
+		}
+	}
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -48,8 +80,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "down", "j":
 			m.index = min(len(m.tasks)-1, m.index+1)
 
+		case "a":
+			m.taskInput.Placeholder = "describe the task..."
+			m.taskInput.Focus()
+
 		case "t":
-			m.tasks[m.index].isCompleted = !m.tasks[m.index].isCompleted
+			m.tasks[m.index].toggle()
 
 		case "ctrl+c", "q":
 			return m, tea.Quit
@@ -60,13 +96,18 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) View() string {
-	lines := []string{"generic tasks\n"}
+	lines := []string{"generic tasks"}
+	lines = append(lines, m.logs...)
 
 	for i, t := range m.tasks {
 		lines = append(lines, m.renderTask(i, t))
 	}
 
-	lines = append(lines, renderCommands())
+	if m.taskInput.Focused() {
+		lines = append(lines, m.renderInputField())
+	} else {
+		lines = append(lines, renderCommands())
+	}
 	return strings.Join(lines, "\n")
 }
 
@@ -89,11 +130,12 @@ func (m *Model) renderTask(index int, t *task) string {
 func renderCommands() string {
 	return fmt.Sprintf(
 		"\n%s appends, %s toggles, %s changes and %s quits",
-		add,
-		toggle,
-		change,
-		quit,
+		add, toggle, change, quit,
 	)
+}
+
+func (m *Model) renderInputField() string {
+	return fmt.Sprintf("\n%s", m.taskInput.View())
 }
 
 func max(a, b int) int {
