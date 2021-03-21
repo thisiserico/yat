@@ -17,6 +17,7 @@ const (
 	add    command = "a"
 	toggle command = "t"
 	change command = "c"
+	delete command = "d"
 	quit   command = "q"
 )
 
@@ -104,6 +105,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.taskInput.SetCursor(len(summary))
 			m.taskInput.Prompt = ""
 
+		case "d":
+			m.tasks.delete(m.index)
+
 		case "ctrl+c", "q":
 			return m, tea.Quit
 		}
@@ -153,8 +157,8 @@ func (m *Model) renderTask(index int, t *task) string {
 
 func renderCommands() string {
 	return fmt.Sprintf(
-		"\n%s appends, %s toggles, %s changes and %s quits",
-		add, toggle, change, quit,
+		"\n%s appends, %s toggles, %s changes, %s deletes and %s quits",
+		add, toggle, change, delete, quit,
 	)
 }
 

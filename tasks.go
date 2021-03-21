@@ -35,6 +35,10 @@ func (t *tasks) append(summary string) {
 	})
 }
 
+func (t *tasks) delete(index int) {
+	*t = append((*t)[:index], (*t)[index+1:]...)
+}
+
 func (t *task) toggle() {
 	t.isCompleted = !t.isCompleted
 }
