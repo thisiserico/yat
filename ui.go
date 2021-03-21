@@ -14,16 +14,14 @@ const (
 	green   color = "\033[0;32m"
 	yellow  color = "\033[0;33m"
 
-	add    command = "a"
-	toggle command = "t"
-	change command = "c"
-	delete command = "d"
-	quit   command = "q"
+	add    = "a"
+	toggle = "t"
+	change = "c"
+	delete = "d"
+	quit   = "q"
 )
 
 type color string
-
-type command string
 
 type Model struct {
 	tasks
@@ -89,15 +87,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "down", "j":
 			m.index = min(len(m.tasks)-1, m.index+1)
 
-		case "a":
+		case add:
 			m.taskInput.Placeholder = "describe the task..."
 			m.taskInput.Focus()
 			m.taskInput.Prompt = "> "
 
-		case "t":
+		case toggle:
 			m.tasks[m.index].toggle()
 
-		case "c":
+		case change:
 			summary := m.tasks[m.index].summary
 			m.isEditing = true
 			m.taskInput.SetValue(summary)
@@ -105,10 +103,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.taskInput.SetCursor(len(summary))
 			m.taskInput.Prompt = ""
 
-		case "d":
+		case delete:
 			m.tasks.delete(m.index)
 
-		case "ctrl+c", "q":
+		case "ctrl+c", quit:
 			return m, tea.Quit
 		}
 	}
@@ -124,13 +122,8 @@ func (m *Model) View() string {
 		lines = append(lines, m.renderTask(i, t))
 	}
 
-	if !m.isEditing {
-		if m.taskInput.Focused() {
-			lines = append(lines, m.renderInputField())
-		} else {
-			lines = append(lines, renderCommands())
-		}
-	}
+	lines = append(lines, m.renderInputField()...)
+	lines = append(lines, m.renderCommands()...)
 
 	return strings.Join(lines, "\n")
 }
@@ -148,22 +141,34 @@ func (m *Model) renderTask(index int, t *task) string {
 		cursor = ">"
 	}
 
+	summary := t.summary
 	if m.isEditing && m.index == index {
-		return fmt.Sprintf("%s %s[%s] %s%s", cursor, color, checked, m.taskInput.View(), nocolor)
+		summary = m.taskInput.View()
 	}
 
-	return fmt.Sprintf("%s %s[%s] %s%s", cursor, color, checked, t.summary, nocolor)
-}
-
-func renderCommands() string {
 	return fmt.Sprintf(
-		"\n%s appends, %s toggles, %s changes, %s deletes and %s quits",
-		add, toggle, change, delete, quit,
+		"%s %s[%s] %s%s",
+		cursor, color, checked, summary, nocolor,
 	)
 }
 
-func (m *Model) renderInputField() string {
-	return fmt.Sprintf("\n%s", m.taskInput.View())
+func (m *Model) renderInputField() []string {
+	if m.isEditing || !m.taskInput.Focused() {
+		return nil
+	}
+
+	return []string{fmt.Sprintf("\n%s", m.taskInput.View())}
+}
+
+func (m *Model) renderCommands() []string {
+	if m.taskInput.Focused() {
+		return nil
+	}
+
+	return []string{fmt.Sprintf(
+		"\n%s appends, %s toggles, %s changes, %s deletes and %s quits",
+		add, toggle, change, delete, quit,
+	)}
 }
 
 func max(a, b int) int {
