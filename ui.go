@@ -26,7 +26,9 @@ type command string
 
 type Model struct {
 	tasks
-	index     int
+	index int
+
+	isEditing bool
 	taskInput textinput.Model
 
 	logs []string
@@ -53,11 +55,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyMsg:
 			switch msg.Type {
 			case tea.KeyEsc:
+				m.isEditing = false
 				m.taskInput.Reset()
 				m.taskInput.Blur()
 
 			case tea.KeyEnter:
-				m.tasks.append(m.taskInput.Value())
+				if m.isEditing {
+					m.isEditing = false
+					m.tasks[m.index].replace(m.taskInput.Value())
+				} else {
+					m.tasks.append(m.taskInput.Value())
+				}
 
 				m.taskInput.Reset()
 				m.taskInput.Blur()
@@ -83,9 +91,18 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "a":
 			m.taskInput.Placeholder = "describe the task..."
 			m.taskInput.Focus()
+			m.taskInput.Prompt = "> "
 
 		case "t":
 			m.tasks[m.index].toggle()
+
+		case "c":
+			summary := m.tasks[m.index].summary
+			m.isEditing = true
+			m.taskInput.SetValue(summary)
+			m.taskInput.Focus()
+			m.taskInput.SetCursor(len(summary))
+			m.taskInput.Prompt = ""
 
 		case "ctrl+c", "q":
 			return m, tea.Quit
@@ -103,11 +120,14 @@ func (m *Model) View() string {
 		lines = append(lines, m.renderTask(i, t))
 	}
 
-	if m.taskInput.Focused() {
-		lines = append(lines, m.renderInputField())
-	} else {
-		lines = append(lines, renderCommands())
+	if !m.isEditing {
+		if m.taskInput.Focused() {
+			lines = append(lines, m.renderInputField())
+		} else {
+			lines = append(lines, renderCommands())
+		}
 	}
+
 	return strings.Join(lines, "\n")
 }
 
@@ -122,6 +142,10 @@ func (m *Model) renderTask(index int, t *task) string {
 	cursor := " "
 	if index == m.index {
 		cursor = ">"
+	}
+
+	if m.isEditing && m.index == index {
+		return fmt.Sprintf("%s %s[%s] %s%s", cursor, color, checked, m.taskInput.View(), nocolor)
 	}
 
 	return fmt.Sprintf("%s %s[%s] %s%s", cursor, color, checked, t.summary, nocolor)

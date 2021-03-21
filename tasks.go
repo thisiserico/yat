@@ -38,3 +38,7 @@ func (t *tasks) append(summary string) {
 func (t *task) toggle() {
 	t.isCompleted = !t.isCompleted
 }
+
+func (t *task) replace(summary string) {
+	t.summary = summary
+}
