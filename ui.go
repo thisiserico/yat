@@ -91,6 +91,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.taskInput.Placeholder = "describe the task..."
 			m.taskInput.Focus()
 			m.taskInput.Prompt = "> "
+			m.index = max(m.index, 0)
 
 		case toggle:
 			m.tasks[m.index].toggle()
@@ -105,6 +106,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case delete:
 			m.tasks.delete(m.index)
+			m.index = min(m.index, len(m.tasks)-1)
 
 		case "ctrl+c", quit:
 			return m, tea.Quit
