@@ -10,24 +10,6 @@ type task struct {
 	addedAt     time.Time
 }
 
-func fakeTaskList() tasks {
-	return tasks{
-		{
-			summary: "a brand new trask",
-			addedAt: time.Now(),
-		},
-		{
-			summary: "this one is not so cool tho...",
-			addedAt: time.Now(),
-		},
-		{
-			summary:     "but this one is completed!",
-			isCompleted: true,
-			addedAt:     time.Now(),
-		},
-	}
-}
-
 func (t *tasks) append(summary string) {
 	*t = append(*t, &task{
 		summary: summary,

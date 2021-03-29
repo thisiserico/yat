@@ -33,9 +33,9 @@ type Model struct {
 	logs []string
 }
 
-func NewUI() *Model {
+func NewUI(tasks tasks) *Model {
 	return &Model{
-		tasks:     fakeTaskList(),
+		tasks:     tasks,
 		taskInput: textinput.NewModel(),
 	}
 }

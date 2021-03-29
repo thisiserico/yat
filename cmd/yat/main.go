@@ -9,7 +9,8 @@ import (
 )
 
 func main() {
-	model := yat.NewUI()
+	store := yat.NewStore()
+	model := yat.NewUI(store.LoadTasks())
 
 	p := tea.NewProgram(model)
 	if err := p.Start(); err != nil {
