@@ -1,12 +1,10 @@
 package yat
 
 import (
-	"bufio"
-	"fmt"
-	"io"
 	"os"
-	"regexp"
 	"time"
+
+	"github.com/pelletier/go-toml"
 )
 
 type Store interface {
@@ -14,75 +12,72 @@ type Store interface {
 	SaveTasks(tasks)
 }
 
-type fileStore struct {
-	file *os.File
+type tomlStore struct {
+	path string
 }
 
-func NewFileStore(file string) Store {
-	f, err := os.OpenFile(file, os.O_CREATE|os.O_RDWR, 0755)
+type tomlConfig struct {
+	Tasks []tomlTask
+}
+
+type tomlTask struct {
+	Summary     string
+	IsCompleted bool
+	AddedAt     time.Time
+}
+
+func NewTomlStore(path string) Store {
+	return &tomlStore{
+		path: path,
+	}
+}
+
+func (t *tomlStore) LoadTasks() tasks {
+	file, err := os.OpenFile(t.path, os.O_CREATE|os.O_RDONLY, 0755)
 	if err != nil {
 		panic(err)
 	}
+	defer file.Close()
 
-	return &fileStore{
-		file: f,
+	var config tomlConfig
+	decoder := toml.NewDecoder(file)
+	if err := decoder.Decode(&config); err != nil {
+		panic(err)
 	}
-}
-
-func (f *fileStore) LoadTasks() tasks {
-	offset, err := f.file.Seek(0, io.SeekCurrent)
-	if err != nil {
-		return nil
-	}
-
-	scanner := bufio.NewScanner(f.file)
-	scanner.Split(func(data []byte, atEof bool) (advance int, token []byte, err error) {
-		advance, token, err = bufio.ScanLines(data, atEof)
-		if err == nil && token != nil {
-			offset += int64(advance)
-		}
-
-		return advance, token, err
-	})
 
 	var tasks tasks
-	regex, _ := regexp.Compile("^\\[([x ])\\] (.+?) (.+)$")
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		if !regex.Match(line) {
-			continue
-		}
-
-		submatches := regex.FindSubmatch(line)
-
-		addedAt := time.Now().UTC()
-		if existingAddedAt, err := time.Parse(time.RFC3339, string(submatches[2])); err == nil {
-			addedAt = existingAddedAt
-		}
+	for _, t := range config.Tasks {
 		tasks = append(tasks, &task{
-			summary:     string(submatches[3]),
-			isCompleted: string(submatches[1]) == "x",
-			addedAt:     addedAt,
+			summary:     t.Summary,
+			isCompleted: t.IsCompleted,
+			addedAt:     t.AddedAt,
 		})
 	}
 
 	return tasks
 }
 
-func (f *fileStore) SaveTasks(tasks tasks) {
-	f.file.Truncate(0)
-	f.file.Seek(0, 0)
+func (t *tomlStore) SaveTasks(tasks tasks) {
+	file, err := os.OpenFile(t.path, os.O_CREATE|os.O_WRONLY, 0755)
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
 
-	for _, task := range tasks {
-		checkMark := " "
-		if task.isCompleted {
-			checkMark = "x"
-		}
-		f.file.WriteString(fmt.Sprintf(
-			"[%s] %s %s\n",
-			checkMark,
-			task.addedAt.Format(time.RFC3339),
-			task.summary,
-		))
+	file.Truncate(0)
+	file.Seek(0, 0)
+
+	config := tomlConfig{}
+	for _, t := range tasks {
+		config.Tasks = append(config.Tasks, tomlTask{
+			Summary:     t.summary,
+			IsCompleted: t.isCompleted,
+			AddedAt:     t.addedAt,
+		})
+	}
+
+	encoder := toml.NewEncoder(file)
+	if err := encoder.Encode(config); err != nil {
+		panic(err)
 	}
 }

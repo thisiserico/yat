@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	store := yat.NewFileStore(expandPath("~/.yat"))
+	store := yat.NewTomlStore(expandPath("~/.yat"))
 	model := yat.NewUI(store)
 	defer model.Flush()
 
