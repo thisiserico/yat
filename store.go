@@ -2,6 +2,7 @@ package yat
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"os"
 	"regexp"
@@ -45,7 +46,7 @@ func (f *fileStore) LoadTasks() tasks {
 	})
 
 	var tasks tasks
-	regex, _ := regexp.Compile("^\\[([x ])\\] (.+) \\| (.+)$")
+	regex, _ := regexp.Compile("^\\[([x ])\\] (.+?) (.+)$")
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		if !regex.Match(line) {
@@ -55,11 +56,11 @@ func (f *fileStore) LoadTasks() tasks {
 		submatches := regex.FindSubmatch(line)
 
 		addedAt := time.Now().UTC()
-		if existingAddedAt, err := time.Parse(time.RFC3339, string(submatches[3])); err == nil {
+		if existingAddedAt, err := time.Parse(time.RFC3339, string(submatches[2])); err == nil {
 			addedAt = existingAddedAt
 		}
 		tasks = append(tasks, &task{
-			summary:     string(submatches[2]),
+			summary:     string(submatches[3]),
 			isCompleted: string(submatches[1]) == "x",
 			addedAt:     addedAt,
 		})
@@ -68,5 +69,20 @@ func (f *fileStore) LoadTasks() tasks {
 	return tasks
 }
 
-func (f *fileStore) SaveTasks(_ tasks) {
+func (f *fileStore) SaveTasks(tasks tasks) {
+	f.file.Truncate(0)
+	f.file.Seek(0, 0)
+
+	for _, task := range tasks {
+		checkMark := " "
+		if task.isCompleted {
+			checkMark = "x"
+		}
+		f.file.WriteString(fmt.Sprintf(
+			"[%s] %s %s\n",
+			checkMark,
+			task.addedAt.Format(time.RFC3339),
+			task.summary,
+		))
+	}
 }

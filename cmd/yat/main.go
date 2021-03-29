@@ -13,7 +13,8 @@ import (
 
 func main() {
 	store := yat.NewFileStore(expandPath("~/.yat"))
-	model := yat.NewUI(store.LoadTasks())
+	model := yat.NewUI(store)
+	defer model.Flush()
 
 	p := tea.NewProgram(model)
 	if err := p.Start(); err != nil {

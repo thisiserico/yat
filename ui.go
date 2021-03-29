@@ -24,6 +24,8 @@ const (
 type color string
 
 type Model struct {
+	store Store
+
 	tasks
 	index int
 
@@ -33,9 +35,10 @@ type Model struct {
 	logs []string
 }
 
-func NewUI(tasks tasks) *Model {
+func NewUI(store Store) *Model {
 	return &Model{
-		tasks:     tasks,
+		store:     store,
+		tasks:     store.LoadTasks(),
 		taskInput: textinput.NewModel(),
 	}
 }
@@ -114,6 +117,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+func (m *Model) Flush() {
+	m.store.SaveTasks(m.tasks)
 }
 
 func (m *Model) View() string {
