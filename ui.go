@@ -2,6 +2,7 @@ package yat
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"strings"
 
@@ -31,8 +32,6 @@ type Model struct {
 
 	isEditing bool
 	taskInput textinput.Model
-
-	logs []string
 }
 
 func NewUI(store Store) *Model {
@@ -43,44 +42,57 @@ func NewUI(store Store) *Model {
 	}
 }
 
-func (m *Model) log(msg string) {
-	m.logs = append(m.logs, msg)
-}
-
 func (m *Model) Init() tea.Cmd {
 	return nil
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if m.taskInput.Focused() {
-		switch msg := msg.(type) {
-		case tea.KeyMsg:
-			switch msg.Type {
-			case tea.KeyEsc:
-				m.isEditing = false
-				m.taskInput.Reset()
-				m.taskInput.Blur()
+	log.Println("foo uipdate")
+	if m, cmd, handled := m.updateTaskInputField(msg); handled {
+		return m, cmd
+	}
 
-			case tea.KeyEnter:
-				if m.isEditing {
-					m.isEditing = false
-					m.tasks[m.index].replace(m.taskInput.Value())
-				} else {
-					m.tasks.append(m.taskInput.Value())
-				}
+	return m.updateTaskNavigator(msg)
+}
 
-				m.taskInput.Reset()
-				m.taskInput.Blur()
+func (m *Model) Flush() {
+	m.store.SaveTasks(m.tasks)
+}
 
-			default:
-				var cmd tea.Cmd
-				m.taskInput, cmd = m.taskInput.Update(msg)
+func (m *Model) updateTaskInputField(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	if !m.taskInput.Focused() {
+		return nil, nil, false
+	}
 
-				return m, cmd
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.Type {
+		case tea.KeyEsc:
+			m.isEditing = false
+			m.taskInput.Reset()
+			m.taskInput.Blur()
+
+		case tea.KeyEnter:
+			value := m.taskInput.Value()
+			if editingExistingTask := m.isEditing; editingExistingTask {
+				m.tasks[m.index].replace(value)
+			} else {
+				m.tasks.append(value)
 			}
+
+			m.isEditing = false
+			m.taskInput.Reset()
+			m.taskInput.Blur()
 		}
 	}
 
+	var cmd tea.Cmd
+	m.taskInput, cmd = m.taskInput.Update(msg)
+	return m, cmd, true
+}
+
+func (m *Model) updateTaskNavigator(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -91,10 +103,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.index = min(len(m.tasks)-1, m.index+1)
 
 		case add:
+			m.index = max(m.index, 0)
+			m.taskInput.Prompt = "> "
 			m.taskInput.Placeholder = "describe the task..."
 			m.taskInput.Focus()
-			m.taskInput.Prompt = "> "
-			m.index = max(m.index, 0)
 
 		case toggle:
 			m.tasks[m.index].toggle()
@@ -102,30 +114,25 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case change:
 			summary := m.tasks[m.index].summary
 			m.isEditing = true
-			m.taskInput.SetValue(summary)
-			m.taskInput.Focus()
-			m.taskInput.SetCursor(len(summary))
 			m.taskInput.Prompt = ""
+			m.taskInput.SetValue(summary)
+			m.taskInput.SetCursor(len(summary))
+			m.taskInput.Focus()
 
 		case delete:
 			m.tasks.delete(m.index)
 			m.index = min(m.index, len(m.tasks)-1)
 
 		case "ctrl+c", quit:
-			return m, tea.Quit
+			cmd = tea.Quit
 		}
 	}
 
-	return m, nil
-}
-
-func (m *Model) Flush() {
-	m.store.SaveTasks(m.tasks)
+	return m, cmd
 }
 
 func (m *Model) View() string {
 	lines := []string{"generic tasks"}
-	lines = append(lines, m.logs...)
 
 	for i, t := range m.tasks {
 		lines = append(lines, m.renderTask(i, t))

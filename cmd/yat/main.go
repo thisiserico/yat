@@ -12,6 +12,12 @@ import (
 )
 
 func main() {
+	f, err := tea.LogToFile("yat.log", "")
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
 	store := yat.NewTomlStore(expandPath("~/.yat"))
 	model := yat.NewUI(store)
 	defer model.Flush()
