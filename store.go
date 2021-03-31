@@ -21,6 +21,7 @@ type tomlConfig struct {
 }
 
 type tomlTask struct {
+	ID          string
 	Summary     string
 	IsCompleted bool
 	AddedAt     time.Time
@@ -48,6 +49,7 @@ func (t *tomlStore) LoadTasks() tasks {
 	var tasks tasks
 	for _, t := range config.Tasks {
 		tasks = append(tasks, &task{
+			id:          t.ID,
 			summary:     t.Summary,
 			isCompleted: t.IsCompleted,
 			addedAt:     t.AddedAt,
@@ -69,7 +71,12 @@ func (t *tomlStore) SaveTasks(tasks tasks) {
 
 	config := tomlConfig{}
 	for _, t := range tasks {
+		id := t.id
+		if id == "" {
+			id = newTaskID()
+		}
 		config.Tasks = append(config.Tasks, tomlTask{
+			ID:          id,
 			Summary:     t.summary,
 			IsCompleted: t.isCompleted,
 			AddedAt:     t.addedAt,

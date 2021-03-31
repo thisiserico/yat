@@ -1,17 +1,27 @@
 package yat
 
-import "time"
+import (
+	"time"
+
+	"github.com/oklog/ulid/v2"
+)
 
 type tasks []*task
 
 type task struct {
+	id          string
 	summary     string
 	isCompleted bool
 	addedAt     time.Time
 }
 
+func newTaskID() string {
+	return ulid.MustNew(ulid.Timestamp(time.Now()), nil).String()
+}
+
 func (t *tasks) append(summary string) {
 	*t = append(*t, &task{
+		id:      newTaskID(),
 		summary: summary,
 		addedAt: time.Now(),
 	})

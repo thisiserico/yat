@@ -2,7 +2,6 @@ package yat
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"strings"
 
@@ -47,7 +46,6 @@ func (m *Model) Init() tea.Cmd {
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	log.Println("foo uipdate")
 	if m, cmd, handled := m.updateTaskInputField(msg); handled {
 		return m, cmd
 	}
