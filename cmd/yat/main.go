@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"os"
 	"os/user"
@@ -12,11 +13,10 @@ import (
 )
 
 func main() {
-	f, err := tea.LogToFile("yat.log", "")
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
+	debug := flag.Bool("debug", false, "use ./yat.log as log output")
+	flag.Parse()
+
+	defer prepareLooger(*debug)
 
 	store := yat.NewTomlStore(expandPath("~/.yat"))
 	model := yat.NewUI(store)
@@ -27,6 +27,23 @@ func main() {
 		log.Println(err)
 		os.Exit(1)
 	}
+}
+
+type closer func() error
+
+func prepareLooger(debugEnabled bool) closer {
+	if !debugEnabled {
+		return func() error {
+			return nil
+		}
+	}
+
+	f, err := tea.LogToFile("yat.log", "")
+	if err != nil {
+		panic(err)
+	}
+
+	return f.Close
 }
 
 func expandPath(path string) string {
