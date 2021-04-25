@@ -12,13 +12,22 @@ import (
 	"github.com/thisiserico/yat"
 )
 
+type filesFlag []string
+
 func main() {
+	var files filesFlag
 	debug := flag.Bool("debug", false, "use ./yat.log as log output")
+	flag.Var(&files, "file", "file to store tasks at")
 	flag.Parse()
 
 	defer prepareLooger(*debug)
 
-	store := yat.NewTomlStore(expandPath("~/.yat"))
+	collection := expandPath("~/.yat")
+	if len(files) > 0 {
+		collection = expandPath(files[0])
+	}
+
+	store := yat.NewTomlStore(collection)
 	model := yat.NewUI(store)
 	defer model.Flush()
 
@@ -27,6 +36,15 @@ func main() {
 		log.Println(err)
 		os.Exit(1)
 	}
+}
+
+func (i *filesFlag) String() string {
+	return "[]"
+}
+
+func (i *filesFlag) Set(collection string) error {
+	*i = append(*i, collection)
+	return nil
 }
 
 type closer func() error
