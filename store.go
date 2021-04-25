@@ -8,8 +8,8 @@ import (
 )
 
 type Store interface {
-	LoadTasks() tasks
-	SaveTasks(tasks)
+	LoadTasks() taskCollection
+	SaveTasks(taskCollection)
 }
 
 type tomlStore struct {
@@ -17,7 +17,8 @@ type tomlStore struct {
 }
 
 type tomlConfig struct {
-	Tasks []tomlTask
+	Collection string
+	Tasks      []tomlTask
 }
 
 type tomlTask struct {
@@ -33,8 +34,8 @@ func NewTomlStore(path string) Store {
 	}
 }
 
-func (t *tomlStore) LoadTasks() tasks {
-	file, err := os.OpenFile(t.path, os.O_CREATE|os.O_RDONLY, 0755)
+func (s *tomlStore) LoadTasks() taskCollection {
+	file, err := os.OpenFile(s.path, os.O_CREATE|os.O_RDONLY, 0755)
 	if err != nil {
 		panic(err)
 	}
@@ -46,21 +47,21 @@ func (t *tomlStore) LoadTasks() tasks {
 		panic(err)
 	}
 
-	var tasks tasks
+	collection := taskCollection{name: config.Collection}
 	for _, t := range config.Tasks {
-		tasks = append(tasks, &task{
-			id:          t.ID,
+		collection.tasks = append(collection.tasks, task{
+			sortableID:  t.ID,
 			summary:     t.Summary,
 			isCompleted: t.IsCompleted,
 			addedAt:     t.AddedAt,
 		})
 	}
 
-	return tasks
+	return collection
 }
 
-func (t *tomlStore) SaveTasks(tasks tasks) {
-	file, err := os.OpenFile(t.path, os.O_CREATE|os.O_WRONLY, 0755)
+func (s *tomlStore) SaveTasks(collection taskCollection) {
+	file, err := os.OpenFile(s.path, os.O_CREATE|os.O_WRONLY, 0755)
 	if err != nil {
 		panic(err)
 	}
@@ -69,14 +70,10 @@ func (t *tomlStore) SaveTasks(tasks tasks) {
 	file.Truncate(0)
 	file.Seek(0, 0)
 
-	config := tomlConfig{}
-	for _, t := range tasks {
-		id := t.id
-		if id == "" {
-			id = newTaskID()
-		}
+	config := tomlConfig{Collection: collection.name}
+	for _, t := range collection.tasks {
 		config.Tasks = append(config.Tasks, tomlTask{
-			ID:          id,
+			ID:          t.sortableID,
 			Summary:     t.summary,
 			IsCompleted: t.isCompleted,
 			AddedAt:     t.addedAt,

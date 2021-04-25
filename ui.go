@@ -26,8 +26,8 @@ type color string
 type Model struct {
 	store Store
 
-	tasks
-	index int
+	collection taskCollection
+	index      int
 
 	isEditing bool
 	taskInput textinput.Model
@@ -35,9 +35,9 @@ type Model struct {
 
 func NewUI(store Store) *Model {
 	return &Model{
-		store:     store,
-		tasks:     store.LoadTasks(),
-		taskInput: textinput.NewModel(),
+		store:      store,
+		collection: store.LoadTasks(),
+		taskInput:  textinput.NewModel(),
 	}
 }
 
@@ -54,7 +54,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) Flush() {
-	m.store.SaveTasks(m.tasks)
+	m.store.SaveTasks(m.collection)
 }
 
 func (m *Model) updateTaskInputField(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
@@ -73,9 +73,9 @@ func (m *Model) updateTaskInputField(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		case tea.KeyEnter:
 			value := m.taskInput.Value()
 			if editingExistingTask := m.isEditing; editingExistingTask {
-				m.tasks[m.index].replace(value)
+				m.collection.change(m.index, value)
 			} else {
-				m.tasks.append(value)
+				m.collection.append(value)
 			}
 
 			m.isEditing = false
@@ -98,7 +98,7 @@ func (m *Model) updateTaskNavigator(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.index = max(0, m.index-1)
 
 		case "down", "j":
-			m.index = min(len(m.tasks)-1, m.index+1)
+			m.index = min(m.collection.len()-1, m.index+1)
 
 		case add:
 			m.index = max(m.index, 0)
@@ -107,10 +107,10 @@ func (m *Model) updateTaskNavigator(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.taskInput.Focus()
 
 		case toggle:
-			m.tasks[m.index].toggle()
+			m.collection.toggle(m.index)
 
 		case change:
-			summary := m.tasks[m.index].summary
+			summary := m.collection.summary(m.index)
 			m.isEditing = true
 			m.taskInput.Prompt = ""
 			m.taskInput.SetValue(summary)
@@ -118,8 +118,8 @@ func (m *Model) updateTaskNavigator(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.taskInput.Focus()
 
 		case delete:
-			m.tasks.delete(m.index)
-			m.index = min(m.index, len(m.tasks)-1)
+			m.collection.delete(m.index)
+			m.index = min(m.index, m.collection.len()-1)
 
 		case "ctrl+c", quit:
 			cmd = tea.Quit
@@ -130,9 +130,9 @@ func (m *Model) updateTaskNavigator(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) View() string {
-	lines := []string{"generic tasks"}
+	lines := []string{m.collection.name}
 
-	for i, t := range m.tasks {
+	for i, t := range m.collection.tasks {
 		lines = append(lines, m.renderTask(i, t))
 	}
 
@@ -142,7 +142,7 @@ func (m *Model) View() string {
 	return strings.Join(lines, "\n")
 }
 
-func (m *Model) renderTask(index int, t *task) string {
+func (m *Model) renderTask(index int, t task) string {
 	color := yellow
 	checked := " "
 	if t.isCompleted {
