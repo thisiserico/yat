@@ -12,16 +12,13 @@ import (
 	"github.com/thisiserico/yat"
 )
 
-type filesFlag []string
-
 func main() {
-	var files filesFlag
-	debug := flag.Bool("debug", false, "use ./yat.log as log output")
-	flag.Var(&files, "file", "file to store tasks at")
+	debug := flag.Bool("d", false, "use ./yat.log as log output")
 	flag.Parse()
 
-	defer prepareLooger(*debug)
+	defer prepareLooger(*debug)()
 
+	files := flag.Args()
 	collection := expandPath("~/.yat")
 	if len(files) > 0 {
 		collection = expandPath(files[0])
@@ -36,15 +33,6 @@ func main() {
 		log.Println(err)
 		os.Exit(1)
 	}
-}
-
-func (i *filesFlag) String() string {
-	return "[]"
-}
-
-func (i *filesFlag) Set(collection string) error {
-	*i = append(*i, collection)
-	return nil
 }
 
 type closer func() error
