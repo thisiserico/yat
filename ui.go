@@ -145,9 +145,17 @@ func (m *Model) updateTaskNavigator(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.modification = addingTask
 
 		case toggleTask:
+			if current.model.len() < 1 {
+				break
+			}
+
 			current.model.toggle(current.index)
 
 		case changeTask:
+			if current.model.len() < 1 {
+				break
+			}
+
 			summary := current.model.summary(current.index)
 			m.inputField.Prompt = ""
 			m.inputField.SetValue(summary)
@@ -156,6 +164,10 @@ func (m *Model) updateTaskNavigator(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.modification = editingTask
 
 		case deleteTask:
+			if current.model.len() < 1 {
+				break
+			}
+
 			current.model.delete(current.index)
 			current.index = min(current.index, current.model.len()-1)
 
