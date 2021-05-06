@@ -42,6 +42,10 @@ func (col *taskCollection) toggle(index int) {
 	col.tasks[index].isCompleted = !col.tasks[index].isCompleted
 }
 
+func (col *taskCollection) rename(name string) {
+	col.name = name
+}
+
 func (col *taskCollection) change(index int, summary string) {
 	col.tasks[index].summary = summary
 }

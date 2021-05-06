@@ -14,18 +14,26 @@ const (
 	green   color = "\033[0;32m"
 	yellow  color = "\033[0;33m"
 
-	taskAbove       = "k"
-	collectionAbove = "K"
-	taskBelow       = "j"
-	collectionBelow = "J"
-	addTask         = "a"
-	toggleTask      = "t"
-	changeTask      = "c"
-	deleteTask      = "d"
-	quit            = "q"
+	taskAbove        = "k"
+	taskBelow        = "j"
+	addTask          = "a"
+	toggleTask       = "t"
+	changeTask       = "c"
+	deleteTask       = "d"
+	collectionAbove  = "K"
+	collectionBelow  = "J"
+	changeCollection = "C"
+	quit             = "q"
+
+	none ongoingModification = iota
+	editingTask
+	addingTask
+	renamingCollection
 )
 
 type color string
+
+type ongoingModification int
 
 type collection struct {
 	store Store
@@ -37,8 +45,8 @@ type Model struct {
 	collections []collection
 	index       int
 
-	isEditing bool
-	taskInput textinput.Model
+	modification ongoingModification
+	inputField   textinput.Model
 }
 
 func NewUI(stores ...Store) *Model {
@@ -51,8 +59,9 @@ func NewUI(stores ...Store) *Model {
 	}
 
 	return &Model{
-		collections: collections,
-		taskInput:   textinput.NewModel(),
+		collections:  collections,
+		inputField:   textinput.NewModel(),
+		modification: none,
 	}
 }
 
@@ -61,27 +70,24 @@ func (m *Model) Init() tea.Cmd {
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if m, cmd, handled := m.updateTaskInputField(msg); handled {
-		return m, cmd
+	if m.modification != none {
+		return m.updateTaskInputField(msg)
 	}
 
 	return m.updateTaskNavigator(msg)
 }
 
 func (m *Model) Flush() {
-	current := m.currentCollection()
-	current.store.SaveTasks(current.model)
+	for _, collection := range m.collections {
+		collection.store.SaveTasks(collection.model)
+	}
 }
 
 func (m *Model) currentCollection() *collection {
 	return &m.collections[m.index]
 }
 
-func (m *Model) updateTaskInputField(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
-	if !m.taskInput.Focused() {
-		return nil, nil, false
-	}
-
+func (m *Model) updateTaskInputField(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
@@ -89,12 +95,18 @@ func (m *Model) updateTaskInputField(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 			m.resetInputField()
 
 		case tea.KeyEnter:
+			value := m.inputField.Value()
 			current := m.currentCollection()
-			value := m.taskInput.Value()
-			if editingExistingTask := m.isEditing; editingExistingTask {
+
+			switch m.modification {
+			case editingTask:
 				current.model.change(current.index, value)
-			} else {
+
+			case addingTask:
 				current.model.append(value)
+
+			case renamingCollection:
+				current.model.rename(value)
 			}
 
 			m.resetInputField()
@@ -102,14 +114,14 @@ func (m *Model) updateTaskInputField(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	}
 
 	var cmd tea.Cmd
-	m.taskInput, cmd = m.taskInput.Update(msg)
-	return m, cmd, true
+	m.inputField, cmd = m.inputField.Update(msg)
+	return m, cmd
 }
 
 func (m *Model) resetInputField() {
-	m.isEditing = false
-	m.taskInput.Reset()
-	m.taskInput.Blur()
+	m.modification = none
+	m.inputField.Reset()
+	m.inputField.Blur()
 }
 
 func (m *Model) updateTaskNavigator(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -127,20 +139,21 @@ func (m *Model) updateTaskNavigator(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case addTask:
 			current.index = max(current.index, 0)
-			m.taskInput.Prompt = "> "
-			m.taskInput.Placeholder = "describe the task..."
-			m.taskInput.Focus()
+			m.inputField.Prompt = "> "
+			m.inputField.Placeholder = "describe the task..."
+			m.inputField.Focus()
+			m.modification = addingTask
 
 		case toggleTask:
 			current.model.toggle(current.index)
 
 		case changeTask:
 			summary := current.model.summary(current.index)
-			m.isEditing = true
-			m.taskInput.Prompt = ""
-			m.taskInput.SetValue(summary)
-			m.taskInput.SetCursor(len(summary))
-			m.taskInput.Focus()
+			m.inputField.Prompt = ""
+			m.inputField.SetValue(summary)
+			m.inputField.SetCursor(len(summary))
+			m.inputField.Focus()
+			m.modification = editingTask
 
 		case deleteTask:
 			current.model.delete(current.index)
@@ -151,6 +164,17 @@ func (m *Model) updateTaskNavigator(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case collectionBelow:
 			m.index = min(len(m.collections)-1, m.index+1)
+
+		case changeCollection:
+			name := current.model.name
+			m.inputField.Prompt = ""
+			if name == "" {
+				m.inputField.Placeholder = "name the collection..."
+			}
+			m.inputField.SetValue(name)
+			m.inputField.SetCursor(len(name))
+			m.inputField.Focus()
+			m.modification = renamingCollection
 
 		case "ctrl+c", quit:
 			cmd = tea.Quit
@@ -179,7 +203,12 @@ func (m *Model) renderCollection(current collection, focusedOnIt, prependEmptyLi
 		prepended = "\n"
 	}
 
-	lines := []string{prepended + current.model.name}
+	name := current.model.name
+	if m.modification == renamingCollection && focusedOnIt {
+		name = m.inputField.View()
+	}
+
+	lines := []string{prepended + name}
 	for i, t := range current.model.tasks {
 		lines = append(lines, m.renderTask(t, focusedOnIt && i == current.index))
 	}
@@ -201,8 +230,8 @@ func (m *Model) renderTask(t task, focusedOnIt bool) string {
 	}
 
 	summary := t.summary
-	if m.isEditing && focusedOnIt {
-		summary = m.taskInput.View()
+	if m.modification == editingTask && focusedOnIt {
+		summary = m.inputField.View()
 	}
 
 	return fmt.Sprintf(
@@ -212,15 +241,15 @@ func (m *Model) renderTask(t task, focusedOnIt bool) string {
 }
 
 func (m *Model) renderInputField() []string {
-	if m.isEditing || !m.taskInput.Focused() {
+	if m.modification != addingTask {
 		return nil
 	}
 
-	return []string{fmt.Sprintf("\n%s", m.taskInput.View())}
+	return []string{fmt.Sprintf("\n%s", m.inputField.View())}
 }
 
 func (m *Model) renderCommands() []string {
-	if m.taskInput.Focused() {
+	if m.modification != none {
 		return nil
 	}
 
