@@ -14,11 +14,15 @@ const (
 	green   color = "\033[0;32m"
 	yellow  color = "\033[0;33m"
 
-	add    = "a"
-	toggle = "t"
-	change = "c"
-	delete = "d"
-	quit   = "q"
+	taskAbove       = "k"
+	collectionAbove = "K"
+	taskBelow       = "j"
+	collectionBelow = "J"
+	addTask         = "a"
+	toggleTask      = "t"
+	changeTask      = "c"
+	deleteTask      = "d"
+	quit            = "q"
 )
 
 type color string
@@ -115,22 +119,22 @@ func (m *Model) updateTaskNavigator(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "up", "k":
+		case taskAbove:
 			current.index = max(0, current.index-1)
 
-		case "down", "j":
+		case taskBelow:
 			current.index = min(current.model.len()-1, current.index+1)
 
-		case add:
+		case addTask:
 			current.index = max(current.index, 0)
 			m.taskInput.Prompt = "> "
 			m.taskInput.Placeholder = "describe the task..."
 			m.taskInput.Focus()
 
-		case toggle:
+		case toggleTask:
 			current.model.toggle(current.index)
 
-		case change:
+		case changeTask:
 			summary := current.model.summary(current.index)
 			m.isEditing = true
 			m.taskInput.Prompt = ""
@@ -138,9 +142,15 @@ func (m *Model) updateTaskNavigator(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.taskInput.SetCursor(len(summary))
 			m.taskInput.Focus()
 
-		case delete:
+		case deleteTask:
 			current.model.delete(current.index)
 			current.index = min(current.index, current.model.len()-1)
+
+		case collectionAbove:
+			m.index = max(0, m.index-1)
+
+		case collectionBelow:
+			m.index = min(len(m.collections)-1, m.index+1)
 
 		case "ctrl+c", quit:
 			cmd = tea.Quit
@@ -216,7 +226,7 @@ func (m *Model) renderCommands() []string {
 
 	return []string{fmt.Sprintf(
 		"\n%s appends, %s toggles, %s changes, %s deletes and %s quits",
-		add, toggle, change, delete, quit,
+		addTask, toggleTask, changeTask, deleteTask, quit,
 	)}
 }
 
