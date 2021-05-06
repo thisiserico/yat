@@ -148,11 +148,9 @@ func (m *Model) updateTaskNavigator(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) View() string {
-	current := m.currentCollection()
-
-	lines := []string{current.model.name}
-	for i, t := range current.model.tasks {
-		lines = append(lines, m.renderTask(i, t))
+	var lines []string
+	for i, collection := range m.collections {
+		lines = append(lines, m.renderCollection(collection, i == m.index)...)
 	}
 
 	lines = append(lines, m.renderInputField()...)
@@ -161,9 +159,16 @@ func (m *Model) View() string {
 	return strings.Join(lines, "\n")
 }
 
-func (m *Model) renderTask(index int, t task) string {
-	current := m.currentCollection()
+func (m *Model) renderCollection(current collection, focusedOnIt bool) []string {
+	lines := []string{current.model.name}
+	for i, t := range current.model.tasks {
+		lines = append(lines, m.renderTask(t, focusedOnIt && i == current.index))
+	}
 
+	return lines
+}
+
+func (m *Model) renderTask(t task, focusedOnIt bool) string {
 	color := yellow
 	checked := " "
 	if t.isCompleted {
@@ -172,12 +177,12 @@ func (m *Model) renderTask(index int, t task) string {
 	}
 
 	cursor := " "
-	if index == current.index {
+	if focusedOnIt {
 		cursor = ">"
 	}
 
 	summary := t.summary
-	if m.isEditing && index == current.index {
+	if m.isEditing && focusedOnIt {
 		summary = m.taskInput.View()
 	}
 
