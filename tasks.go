@@ -1,30 +1,55 @@
 package yat
 
-import "time"
+import (
+	"time"
 
-type tasks []*task
+	"github.com/oklog/ulid/v2"
+)
+
+type taskCollection struct {
+	name  string
+	tasks []task
+}
 
 type task struct {
+	sortableID  string
 	summary     string
 	isCompleted bool
 	addedAt     time.Time
 }
 
-func (t *tasks) append(summary string) {
-	*t = append(*t, &task{
-		summary: summary,
-		addedAt: time.Now(),
+func newTaskID() string {
+	return ulid.MustNew(ulid.Timestamp(time.Now()), nil).String()
+}
+
+func (col *taskCollection) summary(index int) string {
+	return col.tasks[index].summary
+}
+
+func (col *taskCollection) len() int {
+	return len(col.tasks)
+}
+
+func (col *taskCollection) append(summary string) {
+	col.tasks = append(col.tasks, task{
+		sortableID: newTaskID(),
+		summary:    summary,
+		addedAt:    time.Now(),
 	})
 }
 
-func (t *tasks) delete(index int) {
-	*t = append((*t)[:index], (*t)[index+1:]...)
+func (col *taskCollection) toggle(index int) {
+	col.tasks[index].isCompleted = !col.tasks[index].isCompleted
 }
 
-func (t *task) toggle() {
-	t.isCompleted = !t.isCompleted
+func (col *taskCollection) rename(name string) {
+	col.name = name
 }
 
-func (t *task) replace(summary string) {
-	t.summary = summary
+func (col *taskCollection) change(index int, summary string) {
+	col.tasks[index].summary = summary
+}
+
+func (col *taskCollection) delete(index int) {
+	col.tasks = append(col.tasks[:index], col.tasks[index+1:]...)
 }

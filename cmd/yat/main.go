@@ -1,25 +1,31 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"os"
-	"os/user"
-	"path/filepath"
-	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/thisiserico/yat"
 )
 
 func main() {
-	f, err := tea.LogToFile("yat.log", "")
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
+	debug := flag.Bool("d", false, "use ./yat.log as log output")
+	flag.Parse()
 
-	store := yat.NewTomlStore(expandPath("~/.yat"))
-	model := yat.NewUI(store)
+	defer prepareLooger(*debug)()
+
+	files := flag.Args()
+	if len(files) < 1 {
+		files = append(files, ".yat")
+	}
+
+	stores := make([]yat.Store, 0, len(files))
+	for _, file := range files {
+		stores = append(stores, yat.NewTomlStore(file))
+	}
+
+	model := yat.NewUI(stores...)
 	defer model.Flush()
 
 	p := tea.NewProgram(model)
@@ -29,13 +35,19 @@ func main() {
 	}
 }
 
-func expandPath(path string) string {
-	usr, _ := user.Current()
-	dir := usr.HomeDir
+type closer func() error
 
-	if strings.HasPrefix(path, "~/") {
-		path = filepath.Join(dir, path[2:])
+func prepareLooger(debugEnabled bool) closer {
+	if !debugEnabled {
+		return func() error {
+			return nil
+		}
 	}
 
-	return path
+	f, err := tea.LogToFile("yat.log", "")
+	if err != nil {
+		panic(err)
+	}
+
+	return f.Close
 }
