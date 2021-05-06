@@ -16,6 +16,10 @@ func main() {
 	defer prepareLooger(*debug)()
 
 	files := flag.Args()
+	if len(files) < 1 {
+		files = append(files, ".yat")
+	}
+
 	stores := make([]yat.Store, 0, len(files))
 	for _, file := range files {
 		stores = append(stores, yat.NewTomlStore(file))
