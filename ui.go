@@ -23,11 +23,15 @@ const (
 
 type color string
 
-type Model struct {
+type collection struct {
 	store Store
+	model taskCollection
+	index int
+}
 
-	collection taskCollection
-	index      int
+type Model struct {
+	collections []collection
+	index       int
 
 	isEditing bool
 	taskInput textinput.Model
@@ -35,9 +39,13 @@ type Model struct {
 
 func NewUI(store Store) *Model {
 	return &Model{
-		store:      store,
-		collection: store.LoadTasks(),
-		taskInput:  textinput.NewModel(),
+		collections: []collection{
+			{
+				store: store,
+				model: store.LoadTasks(),
+			},
+		},
+		taskInput: textinput.NewModel(),
 	}
 }
 
@@ -54,7 +62,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) Flush() {
-	m.store.SaveTasks(m.collection)
+	current := m.currentCollection()
+	current.store.SaveTasks(current.model)
+}
+
+func (m *Model) currentCollection() *collection {
+	return &m.collections[m.index]
 }
 
 func (m *Model) updateTaskInputField(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
@@ -66,21 +79,18 @@ func (m *Model) updateTaskInputField(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyEsc:
-			m.isEditing = false
-			m.taskInput.Reset()
-			m.taskInput.Blur()
+			m.resetInputField()
 
 		case tea.KeyEnter:
+			current := m.currentCollection()
 			value := m.taskInput.Value()
 			if editingExistingTask := m.isEditing; editingExistingTask {
-				m.collection.change(m.index, value)
+				current.model.change(current.index, value)
 			} else {
-				m.collection.append(value)
+				current.model.append(value)
 			}
 
-			m.isEditing = false
-			m.taskInput.Reset()
-			m.taskInput.Blur()
+			m.resetInputField()
 		}
 	}
 
@@ -89,28 +99,36 @@ func (m *Model) updateTaskInputField(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	return m, cmd, true
 }
 
+func (m *Model) resetInputField() {
+	m.isEditing = false
+	m.taskInput.Reset()
+	m.taskInput.Blur()
+}
+
 func (m *Model) updateTaskNavigator(msg tea.Msg) (tea.Model, tea.Cmd) {
+	current := m.currentCollection()
+
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "up", "k":
-			m.index = max(0, m.index-1)
+			current.index = max(0, current.index-1)
 
 		case "down", "j":
-			m.index = min(m.collection.len()-1, m.index+1)
+			current.index = min(current.model.len()-1, current.index+1)
 
 		case add:
-			m.index = max(m.index, 0)
+			current.index = max(current.index, 0)
 			m.taskInput.Prompt = "> "
 			m.taskInput.Placeholder = "describe the task..."
 			m.taskInput.Focus()
 
 		case toggle:
-			m.collection.toggle(m.index)
+			current.model.toggle(current.index)
 
 		case change:
-			summary := m.collection.summary(m.index)
+			summary := current.model.summary(current.index)
 			m.isEditing = true
 			m.taskInput.Prompt = ""
 			m.taskInput.SetValue(summary)
@@ -118,8 +136,8 @@ func (m *Model) updateTaskNavigator(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.taskInput.Focus()
 
 		case delete:
-			m.collection.delete(m.index)
-			m.index = min(m.index, m.collection.len()-1)
+			current.model.delete(current.index)
+			current.index = min(current.index, current.model.len()-1)
 
 		case "ctrl+c", quit:
 			cmd = tea.Quit
@@ -130,9 +148,10 @@ func (m *Model) updateTaskNavigator(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) View() string {
-	lines := []string{m.collection.name}
+	current := m.currentCollection()
 
-	for i, t := range m.collection.tasks {
+	lines := []string{current.model.name}
+	for i, t := range current.model.tasks {
 		lines = append(lines, m.renderTask(i, t))
 	}
 
@@ -143,6 +162,8 @@ func (m *Model) View() string {
 }
 
 func (m *Model) renderTask(index int, t task) string {
+	current := m.currentCollection()
+
 	color := yellow
 	checked := " "
 	if t.isCompleted {
@@ -151,12 +172,12 @@ func (m *Model) renderTask(index int, t task) string {
 	}
 
 	cursor := " "
-	if index == m.index {
+	if index == current.index {
 		cursor = ">"
 	}
 
 	summary := t.summary
-	if m.isEditing && m.index == index {
+	if m.isEditing && index == current.index {
 		summary = m.taskInput.View()
 	}
 
