@@ -37,15 +37,18 @@ type Model struct {
 	taskInput textinput.Model
 }
 
-func NewUI(store Store) *Model {
+func NewUI(stores ...Store) *Model {
+	collections := make([]collection, 0, len(stores))
+	for _, store := range stores {
+		collections = append(collections, collection{
+			store: store,
+			model: store.LoadTasks(),
+		})
+	}
+
 	return &Model{
-		collections: []collection{
-			{
-				store: store,
-				model: store.LoadTasks(),
-			},
-		},
-		taskInput: textinput.NewModel(),
+		collections: collections,
+		taskInput:   textinput.NewModel(),
 	}
 }
 
@@ -149,8 +152,9 @@ func (m *Model) updateTaskNavigator(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *Model) View() string {
 	var lines []string
+
 	for i, collection := range m.collections {
-		lines = append(lines, m.renderCollection(collection, i == m.index)...)
+		lines = append(lines, m.renderCollection(collection, i == m.index, i > 0)...)
 	}
 
 	lines = append(lines, m.renderInputField()...)
@@ -159,8 +163,13 @@ func (m *Model) View() string {
 	return strings.Join(lines, "\n")
 }
 
-func (m *Model) renderCollection(current collection, focusedOnIt bool) []string {
-	lines := []string{current.model.name}
+func (m *Model) renderCollection(current collection, focusedOnIt, prependEmptyLine bool) []string {
+	prepended := ""
+	if prependEmptyLine {
+		prepended = "\n"
+	}
+
+	lines := []string{prepended + current.model.name}
 	for i, t := range current.model.tasks {
 		lines = append(lines, m.renderTask(t, focusedOnIt && i == current.index))
 	}
